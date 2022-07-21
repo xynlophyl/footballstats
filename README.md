@@ -1,5 +1,9 @@
-# TO DO LIST
-- Develop webpage
-- Find APIs/Sites to scrape
-- Develop data visualization tools
-- Create own backend (?)
+# Football Stats (for lack of a better name) by xynlophyl
+
+##
+
+# Roadmap
+
+
+
+# Development Log
