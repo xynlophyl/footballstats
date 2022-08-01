@@ -59,9 +59,6 @@ class StatsScraper():
     stats.columns = stats.columns.droplevel()
 
     return stats
-    
-  def merge_match_stats(self, advanced_stats):
-    pass
 
   def rename_col_names(self, cols, fields):
     new_cols = []
@@ -142,7 +139,36 @@ class StatsScraper():
 
     return df
 
+  def get_player_stats(self, team_url):
+    
+      print(team, team_url)
+      data = requests.get(team_url)
+      time.sleep(5)
+
+      soup = bs(data.text, 'html.parser')
+      players = soup.select('table.stats_table')[0].select('tbody')[0].select('tr')
+
+      info = {
+        p.find(
+          attrs={'data-stat': 'player'}).text: (p.find('a').get('href'), 
+          p.find(attrs={'data-stat': 'position'}).text
+        ) for p in players if int(p.find(attrs={'data-stat':'games'}).text) > 0
+      }
+
+      print(len(info))
+      for i in info:
+        print(i, info[i])
+      return
+
+
+
+  def get_player_info(self, season):
+    for team, team_url in self.team_urls:
+      print(team, team_url)
+      self.get_player
+
 
 premScraper = StatsScraper('epl')
-df = premScraper.get_matches_info("2021-2022")
-df.to_csv("EPL_21_22.txt")
+premScraper.get_player_info(202)
+# df = premScraper.get_matches_info("2021-2022")
+# df.to_csv("EPL_21_22.txt")
