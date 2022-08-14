@@ -1,174 +1,283 @@
-from re import M
 from bs4 import BeautifulSoup as bs
 import pandas as pd
 import time
 import requests
 
 class StatsScraper():
-  def __init__(self, league) -> None:
-    fbref_links = {'epl': 'https://fbref.com/en/comps/9/Premier-League-Stats', 'efl': 'https://fbref.com/en/comps/10/Championship-Stats'}
-    if league not in fbref_links:
+  """
+  INITIALIZATION
+  """
+  def __init__(self, league: str) -> None:
+    '''
+    scraper is initialized with a target league
+    league: YYYY-YYYY
+    '''
+    league_urls = {'epl': 'https://fbref.com/en/comps/9/Premier-League-Stats', 'efl': 'https://fbref.com/en/comps/10/Championship-Stats'}
+    if league not in league_urls:
       raise Exception('SCRAPE ERROR: League does not exist in our database')
     
-    self.link = fbref_links[league]
-    self.team_urls = self.get_team_urls()
-    self.stat_types = ["att", "def", "gk", "pass", "gsc", "poss", "misc"]
-    # self.stat_types = ["gsc", "misc", "poss", "att", "def", "gk", "pass"]
+    self.league_url = league_urls[league]
+    self.fbref_base_url = 'https://fbref.com'
+
+    self.curr_season = "2022-2023"
 
     self.advanced_stats = {
-      "att":("Shooting", ["Date", "Sh", "SoT", "Dist", "FK", "PK", "PKatt"]), # shooting
-      "def": ("Defensive Actions", ["Date", "Tkl", "TklW", "TklvsDrb", "AttvsDrb", "Press", "Succ", "Blocks", "Int", "Err"]), # defending
-      "gk": ("Goalkeeping", ["Date", "SoTA", "Saves", "PSxG", "PSxG+/-"]), # goalkeeping
-      "pass": ("Passing", ["Date", "PassCmp", "PassAtt", "PassTotDist", "PassPrgDist"]), # passing
-      "gsc": ("Goal and Shot Creation", ['Date','SCA','SCAPassLive','SCAPassDead','SCADrib','SCASh','SCAFld','SCADef','GCA','GCAPassLive','GCAPassDead','GCADrib','GCASh','GCAFld','GCADef']), # gca: merge on whole table
-      "poss": ("Possession", ["Date", "Touches", "Def Pen", "Att Pen", "Carries", "TotDist", "PrgDist", "ProgCarries", "ProgPass"]), # possession
-      "misc": ("Miscellaneous Stats", ["Date", "CrdY", "CrdR", "2CrdY", "Fls", "Fld", "Off", "Recov", "ArlWon", "ArlLost"]), # misc
+      # stat_type: (Header, Columns, New Name Format)
+      "att":("Shooting", ["Date", "Sh", "SoT", "Dist", "FK", "PKscored", "PKatt","Player"], ([("","scored", 18, 19)],[("","scored",15,16)])), # shooting
+      "def":("Defensive Actions", ["Date", "Tkl", "TklW", "TklvsDrb", "AttvsDrb", "Press", "Succ", "Blocks", "Int", "Err", "Player"], ([("", "vsDrb", 14, 19)], [("", "vsDrb", 9, 14)])), # defending
+      "gk":("Goalkeeping", ["Date", "SoTA", "Saves", "PSxG", "PSxG+/-", "Player"],([],[])), # goalkeeping
+      "pass":("Passing", ["Date", "Pass_Cmp", "Pass_Att", "Pass_TotDist", "Pass_PrgDist", "Player"],([("Pass_","", 10, 15)],[("Pass_", "", 5, 10)])), # passing
+      "gsc":("Goal and Shot Creation", ['Date','SCA','SCA_PassLive','SCA_PassDead','SCA_Drib','SCA_Sh','SCA_Fld','SCA_Def','GCA','GCA_PassLive','GCA_PassDead','GCA_Drib','GCA_Sh','GCA_Fld','GCA_Def', "Player"],([("SCA_", "", 11, 17), ("GCA_", "", 18, 24)],[("SCA_", "", 7, 13), ("GCA_", "", 15, 21)])), # gca
+      "poss":("Possession", ["Date", "Touches", "Touches_Def 3rd", "Touches_Att 3rd", "Touches_Att Pen", "Carries", "Carries_TotDist", "Carries_PrgDist", "ProgCarries", "ProgPassRec", "Player"], ([("Touches_", "", 12, 18),("Carries_","",24,26), ("", "Carries", 26, 27), ("","PassRec", 34, 35)],[("Touches_", "", 6, 11),("Carries_","", 18, 20),("", "Carries", 20, 21), ("","PassRec", 28, 29)])), # possession
+      "misc":("Miscellaneous Stats", ["Date", "CrdY", "CrdR", "2CrdY", "Fls", "Fld", "Off", "Recov", "ArlWon", "ArlLost", "Player"],([("Arl", "", 23, 25)],[("Arl", "", 18, 20)])), # misc
     }
 
-    self.advanced_stats_cols = {
-      "att": [],
-      "def": [("", "vsDrb", 14, 19)],
-      "gk": [],
-      "pass": [("Pass","", 10, 15)], 
-      "gsc": [("SCA", "", 11, 17), ("GCA", "", 18, 24)],
-      "poss": [("", "Carries", 26, 27), ("","Pass", 34, 35)],
-      "misc": [("Arl", "", 23, 25)],
-
+    self.formatted_fields = {
+      'round': 'gameweek',
+      'g+a': 'goal_contrib', 'g-pk':'npg', 'g+a-pk':'np_goal_contrib', 'npxg+xa': 'np_xgoal_contrib', 'xg+xa': 'xgoal_contrib',
+      'psxg+/-': 'psxg_pm', 
+      '2crdy': 'twocrdy', '90s': 'ninetys', 'min': 'minutes', 'int': 'inter', 
+      "touches_def 3rd": "touches_defthird", "touches_att pen": "touches_attpen", "touches_att 3rd": "touches_attthird"
     }
-    self.stats_urls = {t: '' for t in self.stat_types}
 
-  def get_team_urls(self):
-    data = requests.get(self.link)
+  """
+  MAIN SCRAPING FUNCTIONS
+  """
+
+  def get_season_stats(self, season: str = ''):
+    '''
+    scrapes team and player stats from every match of each gameweek in a given season
+    '''
+
+    season = season if season else self.curr_season
+    season_url = self.get_season_url(season)
+    all_matches = []
+    all_outfield_players = []
+    all_goalkeepers = []
+
+    for team, team_url in self.get_team_urls(season_url, season).items():
+      print(team, team_url)
+      data = requests.get(team_url)
+      time.sleep(5)
+
+      matches = self.get_season_match_stats(data)
+      outfielders, goalkeepers = self.get_season_player_stats(data)
+
+      matches = self.add_constant_field(matches, {"Team": team, "Season": season})
+      outfielders = self.add_constant_field(outfielders, {"Team": team, "Season": season})
+      goalkeepers = self.add_constant_field(goalkeepers, {"Team": team, "Season": season})
+
+      all_matches.append(matches)
+      all_outfield_players.append(outfielders)
+      all_goalkeepers.append(goalkeepers)
+    
+    matches_df = self.format_df(all_matches)
+    outfielders_df = self.format_df(all_outfield_players)
+    goalkeepers_df = self.format_df(all_goalkeepers)
+
+    matches_df = self.format_matches_df(matches_df)
+
+    return matches_df, outfielders_df, goalkeepers_df
+
+
+  """
+  AUX SCRAPING FUNCTIONS
+  """
+  # url helper functions
+  def get_team_urls(self, url: str, season: str):
+    '''
+    gets all teams playing within target league at a particular season
+    '''
+    data = requests.get(url)
     time.sleep(5)
 
     soup = bs(data.text, 'html.parser')
     standings = soup.select('table.stats_table')[0]
   
     links = [l.get('href') for l in standings.find_all('a')]
-    team_urls = [f'https://fbref.com{l}' for l in links if '/squads/' in l]
-    team_urls = {url.split('/')[-1].replace('-Stats', '').replace('-', ' '): url for url in team_urls}
+    links = [l for l in links if '/squads/' in l]
 
+    team_urls = {}
+    for l in links:
+      url_parts = l.split('/')
+      team = url_parts[-1].replace('-Stats', '').replace('-', ' ')
+      url = self.fbref_base_url + '/'.join(l.split('/')[:4] + [season])
+      team_urls[team] = url
     return team_urls
 
-  def get_advanced_stats(self, link, stat_type):
+  def get_season_url(self, season: str):
+    '''
+    retrieves the url of the target season
+    '''
 
-    data = requests.get(f'https://fbref.com{link}')
-    time.sleep(5)
+    if season == self.curr_season:
+      return self.league_url
+    
+    curr, url = '', self.league_url
+    while True:
+      data = requests.get(url)
+      time.sleep(3)
 
-    stats = pd.read_html(data.text, match=stat_type)[0]
+      soup = bs(data.text, 'html.parser')
+      curr = soup.select('h1')[0].text
+
+      if season in curr:
+        return url
+
+      url = self.fbref_base_url + soup.select('a.prev')[0].get('href')
+
+
+  def get_advanced_stats_url(self, data):
+    soup = bs(data.text, 'html.parser')
+    links = [l.get('href') for l in soup.find_all('a')]
+    links = [l for l in links if l and '/all_comps/' in l]
+    stats_urls = {}
+
+    for l in links:
+      if 'all_comps/shooting/' in l:
+        stats_urls["att"] = self.fbref_base_url+l
+      elif 'all_comps/defense/' in l:
+        stats_urls["def"] = self.fbref_base_url+l
+      elif 'all_comps/keeper/' in l:
+        stats_urls["gk"] = self.fbref_base_url+l
+      elif 'all_comps/passing/' in l:
+        stats_urls["pass"] = self.fbref_base_url+l
+      elif 'all_comps/gca/' in l:
+        stats_urls["gsc"] = self.fbref_base_url+l
+      elif 'all_comps/possession/' in l:
+        stats_urls["poss"] = self.fbref_base_url+l
+      elif 'all_comps/misc/' in l:
+        stats_urls["misc"] = self.fbref_base_url+l
+    return stats_urls
+  
+  # statistic helper functions
+  def get_season_match_stats(self, data):
+    team_matches = pd.read_html(data.text, match= "Scores & Fixtures")[0]
+    advanced_stats_urls = self.get_advanced_stats_url(data)
+
+    for stat_type in self.advanced_stats:
+      url = advanced_stats_urls.get(stat_type, None)
+      if not url:
+        continue
+      header, merge_fields, field_formats = self.advanced_stats[stat_type]
+      data = requests.get(url)
+      time.sleep(5)
+
+      stats = self.get_statistic(data, header)
+      
+      for f in field_formats[0]:
+        stats = self.format_columns(stats,f)
+  
+      try:
+        team_matches = team_matches.merge(stats[merge_fields[:-1]], on="Date")
+      except ValueError:
+        print(f'Scrape Error: No table for {stat_type}')
+        continue
+    
+    team_matches = team_matches.drop(['Match Report', 'Notes'], axis=1)
+    team_matches = team_matches[team_matches["Comp"] == "Premier League"]
+    return team_matches
+    
+  def get_season_player_stats(self, data):
+    player_stats = pd.read_html(data.text, match="Playing Time")[0]
+    player_stats.columns = player_stats.columns.droplevel()
+
+    player_stats = player_stats.loc[player_stats['Min'] >= 90]
+    player_stats = self.remove_values(player_stats, {"Player": ["Squad Total", "Opponent Total"]})
+
+
+    player_stats = player_stats.drop(player_stats.iloc[:, 11:15], axis=1)
+    player_stats = player_stats.loc[:, ~player_stats.columns.duplicated()]
+    player_stats = player_stats.drop(['G+A', 'G+A-PK', 'xG+xA'], axis = 1)
+
+    outfielder_stats, goalkeeper_stats = self.filter_gk_outfield_stats(player_stats)
+
+    for stat_type in self.advanced_stats:
+      header, merge_fields, field_formats = self.advanced_stats[stat_type]
+      stats = self.get_statistic(data, header)
+      if stat_type == "gk":
+        advanced_gk_stats = self.get_statistic(data, "Advanced Goalkeeping")
+        stats = stats.merge(advanced_gk_stats, on="Player", suffixes=('','_DROP')).filter(regex='^(?!.*_DROP)')
+        stats = self.remove_values(stats, {"Player": ["Squad Total", "Opponent Total"]})
+
+      for f in field_formats[1]:
+        stats = self.format_columns(stats, f)
+      
+      outfield, gk = self.filter_gk_outfield_stats(stats)
+
+      try:
+        goalkeeper_stats = goalkeeper_stats.merge(gk[merge_fields[1:]], on="Player")
+        if stat_type != "gk":
+          outfielder_stats = outfielder_stats.merge(outfield[merge_fields[1:]], on="Player")
+      except ValueError:
+        print(f'Scrape Error: No table for {stat_type}')
+        continue
+      
+    outfielder_stats = outfielder_stats.drop(['Matches'], axis = 1)
+    goalkeeper_stats = goalkeeper_stats.drop(['Matches'], axis = 1)
+
+    return outfielder_stats, goalkeeper_stats
+
+
+  def get_statistic(self, data, header):
+    stats = pd.read_html(data.text, match=header)[0]
     stats.columns = stats.columns.droplevel()
 
     return stats
 
-  def rename_col_names(self, cols, fields):
-    new_cols = []
-    exp_before, exp_after, low, high = fields
-    for i, col in enumerate(cols):
-      if i >= low and i < high:
-        col = exp_before + col + exp_after
-      new_cols.append(col)
-    return new_cols
-      
-  def reformat_season(self, season):
+  # formatting functions
+  def format_season(self, season):
+    '''
+    formats season from XXYY-XXYY to YY/YY
+    '''
+
     yrs = season.split('-')
-    return yrs[0][-2:]+'/'+yrs[1][:-2]
+    return yrs[0][-2:]+'_'+yrs[1][:-2]
 
-  def get_matches_info(self, season):
-    s = self.reformat_season(season)
-    all_matches = []
-    for team, url in self.team_urls.items():
-      print(team, url)
-      # getting general stats
-      data = requests.get(url)
-      time.sleep(5)
+  def format_columns(self, stats, format):
+    new_columns = []
+    exp_before, exp_after, low, high = format
 
-      team_matches = pd.read_html(data.text, match= "Scores & Fixtures")[0]
-      soup = bs(data.text, 'html.parser')
-      links = [l.get('href') for l in soup.find_all('a')]
-      links = [l for l in links if l and 'all_comps/' in l]
+    for i, col in enumerate(stats.columns.values):
+      if i >=low and i < high:
+        col = exp_before + col + exp_after
+      new_columns.append(col)
 
-      for l in links:
-        if 'all_comps/shooting/' in l:
-          self.stats_urls["att"] = l
-        elif 'all_comps/defense/' in l:
-          self.stats_urls["def"] = l
-        elif 'all_comps/keeper/' in l:
-          self.stats_urls["gk"] = l
-        elif 'all_comps/passing/' in l:
-          self.stats_urls["pass"] = l
-        elif 'all_comps/gca/' in l:
-          self.stats_urls["gsc"] = l
-        elif 'all_comps/possession/' in l:
-          self.stats_urls["poss"] = l
-        elif 'all_comps/misc/' in l:
-          self.stats_urls["misc"] = l
+    stats.columns = new_columns
+    return stats
 
-      # getting advanced stats
-      for t in self.stat_types:
-        title, fields = self.advanced_stats[t]
-        url = self.stats_urls[t]
-        if not url:
-          continue
-
-        stats = self.get_advanced_stats(url, title)
-
-        stats_cols = stats.columns.values
-        for f in self.advanced_stats_cols[t]:
-          stats_cols = self.rename_col_names(stats_cols, f)
-        stats.columns = stats_cols
-        
-        try:
-            team_matches = team_matches.merge(stats[fields], on="Date")
-        except ValueError:
-          print('error: no stats')
-          continue
-      
-      # adding new columns and removing excess columns
-      team_matches = team_matches.drop(['Result', 'Day', 'Match Report', 'Notes'], axis=1)
-      team_matches = team_matches[team_matches["Comp"] == "Premier League"]
-      team_matches["Team"] = team
-      team_matches["Season"] = s
-      all_matches.append(team_matches)
+  def format_df(self, df):
+    df = pd.concat(df)
+    df = df.reset_index(drop=True)
     
-    # formatting
-    df = pd.concat(all_matches)
-    df.columns = [''.join(c.split(" ")) for c in df.columns]
     season, team = df.pop("Season"), df.pop("Team")
     df.insert(0, "Season", season)
     df.insert(1, "Team", team)
 
+    cols = []
+    for c in df.columns:
+      c = c.lower()
+      c = self.formatted_fields.get(c, c)
+      cols.append(c)
+    df.columns = cols
+
     return df
 
-  def get_player_stats(self, team_url):
+  def format_matches_df(self, df):
+    df['match_id'] = df['season'].astype(str) + '_' +  df['team'].astype(str) + '_' + df['opponent'].astype(str) + '_' + df['venue'].astype(str)
+    return df
+
+  def add_constant_field(self, df, fields: dict):
+    for field, title in fields.items():
+      df[field] = title
     
-      print(team, team_url)
-      data = requests.get(team_url)
-      time.sleep(5)
+    return df
 
-      soup = bs(data.text, 'html.parser')
-      players = soup.select('table.stats_table')[0].select('tbody')[0].select('tr')
-
-      info = {
-        p.find(
-          attrs={'data-stat': 'player'}).text: (p.find('a').get('href'), 
-          p.find(attrs={'data-stat': 'position'}).text
-        ) for p in players if int(p.find(attrs={'data-stat':'games'}).text) > 0
-      }
-
-      print(len(info))
-      for i in info:
-        print(i, info[i])
-      return
-
-
-
-  def get_player_info(self, season):
-    for team, team_url in self.team_urls:
-      print(team, team_url)
-      self.get_player
-
-
-premScraper = StatsScraper('epl')
-premScraper.get_player_info(202)
-# df = premScraper.get_matches_info("2021-2022")
-# df.to_csv("EPL_21_22.txt")
+  def remove_values(self, df, fields: dict):
+    for field, titles in fields.items():
+      for t in titles:
+        df = df.loc[df[field] != t] 
+    return df
+  
+  def filter_gk_outfield_stats(self, df):
+    return df.loc[df['Pos'] != 'GK'], df.loc[df['Pos'] == 'GK']
