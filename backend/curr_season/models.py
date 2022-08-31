@@ -1,7 +1,7 @@
 from django.db import models
 
 # Create your models here.
-class All_Stats(models.Model):
+class Stat(models.Model):
   season = models.CharField(max_length=255, default='')
   team = models.CharField(max_length=255, default='')
 
@@ -77,7 +77,7 @@ class All_Stats(models.Model):
   class Meta:
     abstract = True
 
-class Matches(All_Stats):
+class MatchStat(Stat):
   match_id = models.CharField(max_length=255, primary_key=True)
   date = models.DateField()
   time = models.TimeField()
@@ -97,8 +97,9 @@ class Matches(All_Stats):
   formation = models.CharField(max_length=255)
   referee =  models.CharField(max_length=255)
 
-class Players(All_Stats):
-  player = models.CharField(max_length=255, primary_key=True)
+class PlayerStat(Stat):
+  player_team = models.CharField(max_length=255, primary_key=True)
+  player = models.CharField(max_length=255)
   nation = models.CharField(max_length=255)
   pos = models.CharField(max_length=255)
   age = models.IntegerField(default=0)
@@ -113,4 +114,3 @@ class Players(All_Stats):
   npxg = models.DecimalField(max_digits=6, decimal_places=2,)
   xa = models.DecimalField(max_digits=6, decimal_places=2,)
   np_xgoal_contrib = models.DecimalField(max_digits=6, decimal_places=2, default=0)
-

@@ -1,17 +1,19 @@
+# Virtual environment #
 backend/venv
+
+# test functions #
 backend/scraping/scrape_tester.py
 backend/scraping/fpl_api_requests.py
-backend/db.sqlite3
-backend/data/
-backend/scraping/__pycache__
+backend/assets
 
-# Django #
-backend/*.log
-backend/*.pot
-backend/*.pyc
-backend/__pycache__
-backend/db.sqlite3
+# logs and cache #
+*.log
+*.pot
+*.pyc
+__pycache__
+
+db.sqlite3
 backend/media
 
 # Backup files # 
-backend/*.bak 
+*.bak 
