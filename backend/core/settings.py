@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'curr_season',
     'prev_seasons',
     'fpl',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
