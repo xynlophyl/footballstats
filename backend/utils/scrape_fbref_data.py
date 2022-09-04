@@ -81,6 +81,10 @@ class StatsScraper():
     outfielders_df = self.add_player_id(outfielders_df)
     goalkeepers_df = self.add_player_id(goalkeepers_df)
 
+    outfielders_df = self.format_age(outfielders_df)
+    goalkeepers_df = self.format_age(goalkeepers_df)
+
+
     return matches_df, outfielders_df, goalkeepers_df
     
   """
@@ -264,6 +268,13 @@ class StatsScraper():
       cols.append(c)
     df.columns = cols
 
+    return df
+
+  def format_age(self, df):
+    ages = []
+    for i in df['age']:
+      ages.append(i.split('-')[0])
+    df['age'] = ages
     return df
 
   def add_match_id(self, df):

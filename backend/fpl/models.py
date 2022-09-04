@@ -11,7 +11,7 @@ class Player(models.Model):
   position = models.IntegerField()
   fpl_cost = models.IntegerField()
   fpl_total_points = models.IntegerField()
-  fpl_form = models.IntegerField()
+  fpl_form = models.DecimalField(max_digits=6, decimal_places=2)
 
 class Team(models.Model):
   team_id = models.IntegerField(primary_key=True)
