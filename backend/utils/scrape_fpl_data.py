@@ -57,8 +57,8 @@ class FPLScraper:
       'image': pd.Series(dtype='str'),
       'team_id': pd.Series(dtype='int'),
       'position': pd.Series(dtype='int'),
-      'fpl_cost': pd.Series(dtype='float'),
-      'fpl_total_points': pd.Series(dtype='float'),
+      'fpl_cost': pd.Series(dtype='int'),
+      'fpl_total_points': pd.Series(dtype='int'),
       'fpl_form': pd.Series(dtype='float'),
     })
     
@@ -69,7 +69,8 @@ class FPLScraper:
         el['id'], el['first_name'], el['second_name'], el['web_name'], 
         f"{photo_base_link}{el['code']}.png", 
         el['team'], el['element_type'],
-        el['now_cost'], el['total_points'], el['form']]
+        el['now_cost'], el['total_points'], float(el['form'])
+      ]
  
     return players
   

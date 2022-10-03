@@ -278,12 +278,29 @@ class StatsScraper():
     return df
 
   def add_match_id(self, df):
-    df['match_id'] = df['team'].astype(str) + '_' + df['opponent'].astype(str) + '_' + df['venue'].astype(str)+ '_' +df['season'].astype(str)
+    ids = []
+    for i in range(len(df)):
+      row = df.iloc[i]
+      team = '_'.join(row['team'].split(' '))
+      opp = '_'.join(row['opponent'].split(' '))
+      ids.append(f"{team}_{opp}_{row['venue']}_{row['season']}")
+    
+    df['match_id'] = ids
     return df
 
   def add_player_id(self, df):
-    df['player_team'] = df['player'].astype(str) + '_' + df['team']
+    player_team = []
+
+    for i in range(len(df)):
+      row = df.iloc[i]
+      player = '_'.join(row['player'].split(' '))
+      team = '_'.join(row['team'].split(' '))
+      player_team.append(f"{player}_{team}")
+    
+    df['player_team'] = player_team
+  
     return df
+    
 
   def add_constant_field(self, df, fields: dict):
     for field, title in fields.items():

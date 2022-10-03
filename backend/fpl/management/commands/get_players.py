@@ -13,8 +13,12 @@ class Command(BaseCommand):
   def handle(self, *args, **kwargs):
     engine = create_engine('sqlite:///db.sqlite3')
 
-    print(f'getting player information')
+    print(f'getting player information for the current season')
 
     players = self.scraper.get_players_information()
 
-    players.to_sql(Player._meta.db_table, if_exists='replace', con=engine, index= True)
+    # for i in range(len(players)):
+    #   print(players.iloc[i])
+    #   input()
+
+    players.to_sql(Player._meta.db_table, if_exists='replace', con=engine, index= False)

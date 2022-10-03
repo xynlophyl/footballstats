@@ -24,17 +24,17 @@ router = routers.DefaultRouter()
 # router.register(r'curr', curr_view.PlayerView, 'curr')
 
 # CURRENT SEASON API URLS
-router.register(r'curr_season/players', curr_view.PlayerView, 'curr_season/players')
-router.register(r'curr_season/matches', curr_view.MatchView, 'curr_season/matches')
+router.register(r'curr_season/player', curr_view.PlayerView, 'curr_season/player')
+router.register(r'curr_season/match', curr_view.MatchView, 'curr_season/match')
 
 
 # PREVIOUS SEASON API URLS
 
 # FPL API URLS
-router.register(r'fpl/players', fpl_view.PlayerView, 'fpl/players')
-router.register(r'fpl/teams', fpl_view.TeamView, 'fpl/teams')
-router.register(r'fpl/fixtures', fpl_view.FixtureView, 'fpl/fixtures')
-router.register(r'fpl/squads', fpl_view.SquadView, 'fpl/squads')
+router.register(r'fpl/player', fpl_view.PlayerView, 'fpl/player')
+router.register(r'fpl/team', fpl_view.TeamView, 'fpl/team')
+router.register(r'fpl/fixture', fpl_view.FixtureView, 'fpl/fixture')
+router.register(r'fpl/squad', fpl_view.SquadView, 'fpl/squad')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

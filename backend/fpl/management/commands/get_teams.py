@@ -17,6 +17,6 @@ class Command(BaseCommand):
 
     teams = self.scraper.get_team_information()
 
-    teams.to_sql(Team._meta.db_table, if_exists='replace', con=engine, index= True)
+    teams.to_sql(Team._meta.db_table, if_exists='replace', con=engine, index= False)
 
 

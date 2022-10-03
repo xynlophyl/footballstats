@@ -7,8 +7,9 @@ def scrape_fbref_data():
   t = time.time()
   path = 'static/2022-2023/'
 
-  s = StatsScraper('epl')
+  # df = pd.read_csv(path+"2022_2023_outfield.csv")
 
+  s = StatsScraper('epl')
   matches, outfielders, goalkeepers = s.get_season_stats()  
   matches.to_csv(path+'2022_2023_matches.csv')
   outfielders.to_csv(path+'2022_2023_outfield.csv')

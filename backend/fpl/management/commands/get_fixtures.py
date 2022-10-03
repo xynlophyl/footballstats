@@ -17,6 +17,6 @@ class Command(BaseCommand):
 
     fixtures = self.scraper.get_fixtures()
 
-    fixtures.to_sql(Fixture._meta.db_table, if_exists='replace', con=engine, index= True)
+    fixtures.to_sql(Fixture._meta.db_table, if_exists='replace', con=engine, index= False)
 
 
